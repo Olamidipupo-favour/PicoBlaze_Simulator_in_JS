@@ -6,12 +6,17 @@ document.getElementById("assemblyCode").
        oninput=syntaxHighlighter;
 */
 setUpLineNumbers();
-document.getElementById("assemblyCode").oninput = setUpLineNumbers;
+let hasTheCodeBeenModifiedSinceLastSuccessfulAssembly = false;
+document.getElementById("assemblyCode").oninput = () => {
+  setUpLineNumbers();
+  hasTheCodeBeenModifiedSinceLastSuccessfulAssembly = true;
+};
 document.getElementById("assemblyCode").onscroll = () => {
   document.getElementById("lineNumbers")
       .scroll(0, document.getElementById("assemblyCode").scrollTop);
 };
 document.getElementById("highlightButton").onclick = syntaxHighlighter;
+let hasTheCodeBeenAssembled = false;
 document.getElementById("assembleButton").onclick = () => {
   const assembly = document.getElementById("assemblyCode").innerText;
 
@@ -55,6 +60,8 @@ document.getElementById("assembleButton").onclick = () => {
   }
   drawTable();
   stopSimulation();
+  hasTheCodeBeenAssembled = true;
+  hasTheCodeBeenModifiedSinceLastSuccessfulAssembly = false;
 };
 function stopSimulation() {
   document.getElementById("fastForwardButton").disabled = false;
@@ -86,6 +93,17 @@ setupLayout();
 window.onresize = setupLayout;
 drawTable();
 displayRegistersAndFlags();
+window.onscroll = () => {
+  if (window.innerWidth >= 700) {
+    if (window.scrollY > document.getElementById("assemblyCode").clientHeight) {
+      document.body.style.backgroundPosition = "top left";
+    } else {
+      document.body.style.backgroundPosition = "top right";
+    }
+  } else {
+    document.body.style.backgroundPosition = "top left";
+  }
+};
 function onPlayPauseButton() {
   playing = !playing;
   if (!playing) {
@@ -96,6 +114,17 @@ function onPlayPauseButton() {
     document.getElementById("playImage").style.display = "inline";
     document.getElementById("pauseImage").style.display = "none";
   } else {
+    if (!hasTheCodeBeenAssembled) {
+      if (!confirm(
+              "The code has not been assembled. Do you really want to proceed starting the emulation?"))
+        return;
+    } else if (
+        hasTheCodeBeenModifiedSinceLastSuccessfulAssembly) // https://github.com/FlatAssembler/PicoBlaze_Simulator_in_JS/issues/28
+    {
+      if (!confirm(
+              "The code has been modified since the last successful assembling. Are you sure you want to proceed starting the emulation?"))
+        return;
+    }
     if (!document.getElementById("shouldWeUpdateRegisters")
              .checked) // https://github.com/FlatAssembler/PicoBlaze_Simulator_in_JS/issues/20
       document.getElementById("PC_label_" + formatAsAddress(PC)).innerHTML =
@@ -114,6 +143,17 @@ function onSingleStepButton() {
   simulateOneInstruction();
 }
 function fastForward() {
+  if (!hasTheCodeBeenAssembled) {
+    if (!confirm(
+            "The code has not been assembled. Do you really want to proceed starting the emulation?"))
+      return;
+  } else if (
+      hasTheCodeBeenModifiedSinceLastSuccessfulAssembly) // https://github.com/FlatAssembler/PicoBlaze_Simulator_in_JS/issues/28
+  {
+    if (!confirm(
+            "The code has been modified since the last successful assembling. Are you sure you want to proceed starting the emulation?"))
+      return;
+  }
   playing = true;
   if (!document.getElementById("shouldWeUpdateRegisters")
            .checked) // https://github.com/FlatAssembler/PicoBlaze_Simulator_in_JS/issues/20
@@ -235,19 +275,22 @@ fetch(URL_of_JSON_with_examples)
       if (!response.ok)
         throw new Error(response.status);
       else
-        return response.text();
+        return response.json();
     })
-    .then((jsonFromGithub) => {
-      const examplesArray = JSON.parse(jsonFromGithub);
+    .then((examplesArray) => {
       let examplesHTML = examplesArray
                              .map((example) => `
-    <div class="exampleCodeLink" onclick="fetchExample('${
-                                      example.file_name}')">
+    <button class="exampleCodeLink" onclick="fetchExample('${
+                                      example.file_name}')"
+				      ${
+                                      /WebPositive/.test(navigator.userAgent)
+                                          ? "style=\"font-size:12px;\""
+                                          : ""}>
       <img
         src="${example.image}"
         alt="${example.image_alt}"
       /><br/>${example.name}
-    </div>
+    </button>
         `).join("") + `
     <div class="exampleCodeLink" style="display: flex">
       <div class="callForMoreExamples">
@@ -264,13 +307,7 @@ fetch(URL_of_JSON_with_examples)
         > or <a href="https://reddit.com/r/PicoBlaze">Reddit</a>!
       </div>
     </div>
-    <div style="width: 1px; flex-shrink: 0">
-      <!--
-          Because, apparently, CSS ignores the right-margin on flex
-          elements that cause overflow.
-     -->
-    </div>
-      `;
+`;
       document.getElementById("examples").style.justifyContent = "initial";
       document.getElementById("examples").style.alignItems = "initial";
       document.getElementById("examples").innerHTML = examplesHTML;

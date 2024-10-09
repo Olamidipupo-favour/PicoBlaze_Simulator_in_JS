@@ -1,18 +1,26 @@
 <?php
+
 class Database {
+
     private static $instance;
     private $connection;
 
     private function __construct() {
         $servername = "mysql-p";
         $username = "p3379031rw";
-        $password = file_get_contents(".env");
+        $password = substr(file_get_contents(".env"), strlen("password="));
+        if (substr($password, -1, 1) == "\n") {
+            $password = substr($password, 0, strlen($password) - 1);
+        }
+        if (substr($password, -1, 1) == "\r") {
+            $password = substr($password, 0, strlen($password) - 1);
+        }
         $dbname = "p3379031_assembler_db";
 
         try {
             $this->connection = new PDO("mysql:host=$servername;dbname=$dbname", $username, $password);
             $this->connection->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-        } catch(PDOException $e) {
+        } catch (PDOException $e) {
             die("Connection failed: " . $e->getMessage());
         }
     }
@@ -36,7 +44,7 @@ if (isset($_POST['code'])) {
 
     $stmt = $conn->prepare("INSERT INTO programs (code) VALUES (:code)");
     $stmt->bindParam(':code', $code);
-    
+
     try {
         $stmt->execute();
         $lastInsertedId = $conn->lastInsertId();
@@ -68,5 +76,4 @@ if (isset($_GET['id'])) {
         echo "Program not found!";
     }
 }
-
 ?>

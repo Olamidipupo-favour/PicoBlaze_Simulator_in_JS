@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="An on-line assembler and emulator for Xilinx PicoBlaze, runnable in a modern browser (starting with Firefox 52)."
+      content="An on-line assembler and emulator for Xilinx PicoBlaze, runnable in a modern browser (starting with Firefox 52). This version has a back-end."
     />
     <meta name="author" content="Teo Samarzija" />
     <meta charset="UTF-8" />
@@ -34,6 +34,13 @@
   </head>
   <body>
     <svg id="emptySVG" style="display: none"></svg>
+    <div id="ribbon">
+      <a
+        href="https://github.com/FlatAssembler/PicoBlaze_Simulator_in_JS.git"
+        target="_blank"
+        >Fork me on GitHub!</a
+      >
+    </div>
     <header>
       <h1>PicoBlaze Simulator</h1>
       <span id="authors"
@@ -51,22 +58,22 @@
 ;Insert PicoBlaze assembly here...
 </pre
       >
-      <div id="divWithExamples">
-        <span id="examplesSpan"
-          >Example
+      <section id="divWithExamples">
+        <h2 id="examplesSpan">
+          Example
           <img
             style="vertical-align: bottom"
             src="https://icons.getbootstrap.com/assets/icons/code-square.svg"
             alt="program"
-          />s:</span
-        >
+          />s:
+        </h2>
         <div id="examples">
           <span id="fetchingExamples">
             Fetching the examples from GitHub...
           </span>
         </div>
-      </div>
-      <div id="buttons">
+      </section>
+      <section id="buttons">
         <button id="highlightButton">
           Highlight
           <img
@@ -83,8 +90,15 @@
           />
         </button>
         <button id="assembleButton">Assemble</button>
-      </div>
-      <div id="divWithMachineCode">
+      </section>
+      <section id="whyClickAssemble">
+        Please click the
+        <a href="#assembleButton">&quot;<i>Assemble</i>&quot; button</a> before
+        proceeding, or else you will be simulating PicoBlaze that constantly
+        loops <code>load s0, s0</code> (which is <code>00000</code> in
+        hexadecimal).
+      </section>
+      <section id="divWithMachineCode">
         <div id="warningAboutJavaScript">
           Your browser doesn't seem to support modern JavaScript, needed for
           this web-app!<br />
@@ -109,7 +123,7 @@
             >polyfilling your browser with BabelJS</a
           >.
         </div>
-      </div>
+      </section>
       <script>
         function downloadBabel() {
           document.getElementById("objectAssignPolyfill").src =
@@ -140,7 +154,7 @@
           }
         }
       </script>
-      <div id="simulationButtons">
+      <section id="simulationButtons">
         <button id="playPauseButton">
           <img
             src="play.svg"
@@ -170,8 +184,8 @@
           <img src="stop.svg" alt="Stop" />
           <span class="tooltip">Stop</span>
         </button>
-      </div>
-      <div id="graphicalResults"></div>
+      </section>
+      <section id="graphicalResults"></section>
       <button id="UART_enable_button">
         <span id="enable_or_disable_UART">Enable</span>
         <abbr title="Universal Asynchronous Receiver-Transmitter">UART</abbr>
@@ -180,15 +194,15 @@
           alt="terminal"
         />
       </button>
-      <div id="UART_IO">
+      <section id="UART_IO">
         <label for="UART_INPUT"
           >UART input (<i>enter <b>before</b> starting</i>):</label
         >
         <textarea id="UART_INPUT"></textarea>
         <label>UART output:</label>
         <pre id="UART_OUTPUT"></pre>
-      </div>
-      <div id="simulationResults"></div>
+      </section>
+      <section id="simulationResults"></section>
     </main>
     <footer>
       Not affiliated with
@@ -228,7 +242,8 @@
       Also, maybe it would be a good idea to implement some back-end on
       <a href="https://picoblaze-simulator.sourceforge.io/">SourceForge</a> so
       that people can comment on and share PicoBlaze programs, given that
-      SourceForge lets us run PHP on their servers for free.<br /><br />
+      SourceForge lets us run PHP on their servers for free. (UPDATE: Abidin
+      Durdu has done that. However, it can probably be improved.)<br /><br />
       <span id="Bachelor_thesis"
         >IMPORTANT: Don't take this to be an example of a good Bachelor thesis.
         In fact, this is an example of what <b>not</b> to do for a Bachelor
@@ -268,7 +283,12 @@
       PHP and make it possible for users to share their own PicoBlaze assembly
       programs (in other words, to make a back-end). However, my mental health
       has deteriorated once again (I am having panic attacks almost every day
-      now), so I am unlikely to be able to do that any time soon.
+      now), so I am unlikely to be able to do that any time soon. Alprazolam
+      does help, but it does not do miracles.<br /><br />
+      UPDATE on 05/07/2024: I have made
+      <a href="https://youtu.be/ckAvsglxTVc"
+        >a YouTube video about this program</a
+      >.
       <script>
         //Copied from: https://flatassembler.github.io/compiler
         //I have written that many years ago...
@@ -363,6 +383,31 @@
         if (document.cookie.indexOf("cookie_banner_closed") != -1)
           document.getElementById("MIT_licence").remove();
       </script>
+    </div>
+    <div id="uploadSuccessfulMessage">
+      <div id="titleBar">Success!</div>
+      <div id="messageAccompanyingTheURL">
+        Your assembly language program was successfully uploaded to the
+        database. Here is the URL by which you and other people can access it:
+      </div>
+      <div id="shareURL">
+        https://picoblaze-simulator.sourceforge.io/PicoBlaze.html?id=placeholder
+      </div>
+      <button
+        onclick="document.getElementById('uploadSuccessfulMessage').style.display='none'"
+        id="closeButton"
+      >
+        <img
+          src="https://icons.getbootstrap.com/assets/icons/x-lg.svg"
+          alt="Close"
+        />
+      </button>
+      <button onclick="copyShareURLToClipboard()" id="copyButton">
+        <img
+          src="https://icons.getbootstrap.com/assets/icons/copy.svg"
+          alt="Copy to clipboard"
+        />
+      </button>
     </div>
   </body>
 </html>

@@ -61,6 +61,11 @@ class TreeNode {
     if (this.text == "|")
       return (this.children[0].interpretAsArithmeticExpression(constants) ||
               this.children[1].interpretAsArithmeticExpression(constants));
+    if (this.text == "?:")
+      return (
+          this.children[0].interpretAsArithmeticExpression(constants)
+              ? this.children[1].interpretAsArithmeticExpression(constants)
+              : this.children[2].interpretAsArithmeticExpression(constants));
     if (this.text == "()") {
       if (this.children.length != 1) {
         alert("Line #" + this.lineNumber +
@@ -69,10 +74,69 @@ class TreeNode {
       }
       return this.children[0].interpretAsArithmeticExpression(constants);
     }
-    if (/\'d/.test(this.text))
-      return parseInt(this.text.substr(0, this.text.length - 2));
-    if (/\'b/.test(this.text))
-      return parseInt(this.text.substr(0, this.text.length - 2), 2);
+    if (this.text == "invertBits()") {
+      if (this.children.length != 1) {
+        alert("Line #" + this.lineNumber +
+              ": The node 'invertBits()' doesn't have exactly 1 child.");
+        return NaN;
+      }
+      return ~this.children[0].interpretAsArithmeticExpression(constants);
+    }
+    if (this.text == "bitand()") {
+      if (this.children.length != 3 || this.children[1].text != ',') {
+        alert(
+            "Line #" + this.lineNumber +
+            ": The node 'bitand()' doesn't have exactly 3 children (a comma is also a child node).");
+        return NaN;
+      }
+      return this.children[0].interpretAsArithmeticExpression(constants) &
+             this.children[2].interpretAsArithmeticExpression(constants);
+    }
+    if (this.text == "bitor()") {
+      if (this.children.length != 3 || this.children[1].text != ',') {
+        alert(
+            "Line #" + this.lineNumber +
+            ": The node 'bitor()' doesn't have exactly 3 children (a comma is also a child node).");
+        return NaN;
+      }
+      return this.children[0].interpretAsArithmeticExpression(constants) |
+             this.children[2].interpretAsArithmeticExpression(constants);
+    }
+    if (this.text == "mod()") {
+      if (this.children.length != 3 || this.children[1].text != ',') {
+        alert(
+            "Line #" + this.lineNumber +
+            ": The node 'mod()' doesn't have exactly 3 children (a comma is also a child node).");
+        return NaN;
+      }
+      return this.children[0].interpretAsArithmeticExpression(constants) %
+             this.children[2].interpretAsArithmeticExpression(constants);
+    }
+    if (/\'d$/.test(this.text)) {
+      for (let i = 0; i < this.text.length - 2; i++)
+        if (this.text.charCodeAt(i) < '0'.charCodeAt(0) ||
+            this.text.charCodeAt(i) > '9'.charCodeAt(0)) {
+          alert(
+              "Line #" + this.lineNumber + ": `" + this.text +
+              "` is not a valid decimal constant!"); // https://github.com/FlatAssembler/PicoBlaze_Simulator_in_JS/issues/27
+          return NaN;
+        }
+      return parseInt(this.text.substring(
+          0,
+          this.text.length -
+              2)); // https://github.com/FlatAssembler/PicoBlaze_Simulator_in_JS/issues/30
+    }
+    if (/\'b$/.test(this.text)) {
+      for (let i = 0; i < this.text.length - 2; i++)
+        if (!(this.text[i] == '0' || this.text[i] == '1')) {
+          alert("Line #" + this.lineNumber + ": `" + this.text +
+                "` is not a valid binary constant!");
+          return NaN;
+        }
+      return parseInt(
+          this.text.substring(0, this.text.length - 2),
+          2); // https://github.com/FlatAssembler/PicoBlaze_Simulator_in_JS/issues/30
+    }
     if (/^([a-f]|[0-9])*$/i.test(this.text))
       return parseInt(this.text, 16);
     if (this.text[0] === '"' && this.text.length === 3)
@@ -107,9 +171,12 @@ class TreeNode {
   }
   getRegisterNumber(registers) {
     if (registers.has(this.text))
-      return registers.get(this.text).substr(1).toLowerCase();
+      return registers.get(this.text)
+          .substring(1)
+          .toLowerCase(); // https://github.com/FlatAssembler/PicoBlaze_Simulator_in_JS/issues/30
     if (/^s(\d|[a-f])$/i.test(this.text))
-      return this.text.substr(1).toLowerCase();
+      return this.text.substring(1)
+          .toLowerCase(); // https://github.com/FlatAssembler/PicoBlaze_Simulator_in_JS/issues/30
     return "none";
   }
   getLabelAddress(labels, constants) {

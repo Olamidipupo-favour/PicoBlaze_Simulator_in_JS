@@ -155,7 +155,7 @@ display a
 endif
 
 
-ADDRESS 000
+ADDRESS 0
 START:
 ;At the beginning, the number is 0.
 load s0, 0
@@ -277,7 +277,7 @@ call    nc     , abort
 ;in the correct order. The pointer now
 ;points at a memory location right after
 ;the binary number (not at the last digit,
-;but after it).
+;but right after it).
 beginning_of_printing_loop:
   sub   pointer, 1
   jump  c      , end_of_printing_loop
@@ -467,7 +467,7 @@ RETURN
 
 ;By the way, you might also be interested
 ;in seeing the
-;<a href="https://github.com/FlatAssembler/SimpleCalculator/blob/master/IEEE.ASM">decimal-to-IEEE754-hexadecimal converter</a>
+;<a href="https://github.com/FlatAssembler/SimpleCalculator/blob/master/IEEE.ASM">decimal-to-IEEE754-binary converter</a>
 ;I wrote in x86 assembly back when
 ;I was 15. I am sorry that the comments
 ;and the variable names are in Croatian,
