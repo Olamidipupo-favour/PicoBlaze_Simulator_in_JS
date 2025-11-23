@@ -58,21 +58,27 @@ function isDirective(str) {
   for (const directive of preprocessor)
     if (RegExp("^" + directive + "$", "i").test(str))
       return true;
-  if (/:$/.test(str))
+  if (/:$/.test(str) && str.length > 1) // To the core of the assembler, labels
+                                        // are preprocessor directives.
     return true;
   return false;
 }
 
 function assemble(root_of_abstract_syntax_tree, output_of_preprocessor) {
-  if (root_of_abstract_syntax_tree.text !== "assembly") {
+  if (!(root_of_abstract_syntax_tree instanceof TreeNode) ||
+      root_of_abstract_syntax_tree.text !== "assembly") {
     alert(
         "Internal assembler error: The first argument of the \"assemble\" function is not the root of the abstract syntax tree (AST)!");
     return;
   }
   machineCode = [];
   for (let i = 0; i < 4096; i++)
-    machineCode.push({hex : "00000", line : 0});
+    machineCode.push({hex : "00000", line : 0, disableBreakpoint : false});
+  if (typeof PicoBlaze == "object" &&
+      typeof PicoBlaze.resetDisabledBreakpoints == "function")
+    PicoBlaze.resetDisabledBreakpoints();
   let address = 0;
+  default_base_of_literals_in_assembly = 16;
   for (const node_of_depth_1 of root_of_abstract_syntax_tree.children) {
     const check_if_the_only_argument_is_register = () => {
       // Let's reduce the code repetition a bit by using lambda functions...
@@ -108,10 +114,114 @@ function assemble(root_of_abstract_syntax_tree, output_of_preprocessor) {
       }
       return 1;
     };
-    if (/^address$/i.test(node_of_depth_1.text))
+    if (/^BASE_HEXADECIMAL$/i.test(node_of_depth_1.text)) {
+      default_base_of_literals_in_assembly = 16;
+      if (node_of_depth_1.children.length == 1) {
+        default_base_of_literals_in_assembly =
+            node_of_depth_1.children[0].interpretAsArithmeticExpression(
+                output_of_preprocessor.constants);
+      } else if (
+          node_of_depth_1.children.length !=
+          0) { // https://github.com/FlatAssembler/PicoBlaze_Simulator_in_JS/issues/35
+        alert(
+            "Line " + node_of_depth_1.lineNumber +
+            ': The "BASE_HEXADECIMAL" pseudo-mnemonic should have 0 or 1 arguments.');
+        return;
+      }
+    } else if (/^BASE_DECIMAL$/i.test(node_of_depth_1.text)) {
+      default_base_of_literals_in_assembly = 10;
+      if (node_of_depth_1.children.length == 1) {
+        default_base_of_literals_in_assembly =
+            node_of_depth_1.children[0].interpretAsArithmeticExpression(
+                output_of_preprocessor.constants);
+      } else if (node_of_depth_1.children.length != 0) {
+        alert(
+            "Line " + node_of_depth_1.lineNumber +
+            ': The "BASE_DECIMAL" pseudo-mnemonic should have 0 or 1 arguments.');
+        return;
+      }
+    }
+    // TODO: What if there is a BASE_DECIMAL or BASE_DECIMAL inside an
+    // if-statement or a while-loop? You can see a discussion on that here:
+    // https://github.com/FlatAssembler/PicoBlaze_Simulator_in_JS/issues/34
+    else if (/^address$/i.test(node_of_depth_1.text))
       address = node_of_depth_1.children[0].interpretAsArithmeticExpression(
           output_of_preprocessor.constants);
-    else if (/^load$/i.test(node_of_depth_1.text)) {
+    else if (/^print_string$/i.test(node_of_depth_1.text)) {
+      if (node_of_depth_1.children.length !== 5) {
+        alert(
+            "Line #" + node_of_depth_1.lineNumber +
+            ": The 'print_string' node should have exactly five (5) child nodes!");
+        return;
+      }
+      if (node_of_depth_1.children[1].text !== ",") {
+        alert("Line #" + node_of_depth_1.lineNumber +
+              ": Expected a comma (',') instead of '" +
+              node_of_depth_1.children[1].text + "'!");
+        return;
+      }
+      if (node_of_depth_1.children[3].text !== ",") {
+        alert("Line #" + node_of_depth_1.lineNumber +
+              ": Expected a comma (',') instead of '" +
+              node_of_depth_1.children[3].text + "'!");
+        return;
+      }
+      if (node_of_depth_1.children[2].getRegisterNumber(
+              output_of_preprocessor.namedRegisters) === "none") {
+        alert("Line #" + node_of_depth_1.lineNumber + ': "' +
+              node_of_depth_1.children[2].text + '" is not a register!');
+        return;
+      }
+      if (node_of_depth_1.children[4].getLabelAddress(
+              output_of_preprocessor.labels,
+              output_of_preprocessor.constants) === "none") {
+        alert("Line #" + node_of_depth_1.lineNumber + ": Label '" +
+              node_of_depth_1.children[4].text + "' is not declared!");
+        return;
+      }
+      for (let i = 1; i < node_of_depth_1.children[0].text.length - 1; i++) {
+        if (node_of_depth_1.children[0].text.charCodeAt(i) > 255) {
+          alert("Line #" + node_of_depth_1.lineNumber + ": The character '" +
+                node_of_depth_1.text[i] + "' is not a valid ASCII character!");
+          return;
+        }
+        if (node_of_depth_1.children[0].text.charCodeAt(i) < 0) {
+          alert("Line #" + node_of_depth_1.lineNumber + ": The character '" +
+                node_of_depth_1.text[i] + "' is not a valid ASCII character!");
+          return;
+        }
+        machineCode[address].hex = "01";
+        machineCode[address].hex +=
+            node_of_depth_1.children[2].getRegisterNumber(
+                output_of_preprocessor.namedRegisters);
+        machineCode[address].hex +=
+            formatAsByte(node_of_depth_1.children[0].text.charCodeAt(i));
+        machineCode[address].line =
+            node_of_depth_1
+                .lineNumber; // Is this actually a good idea? I've asked a
+                             // question about that at StackExchange:
+                             // https://langdev.stackexchange.com/q/4378/330
+        if (i > 1) {
+          machineCode[address].disableBreakpoint = true;
+          if (typeof PicoBlaze == "object" &&
+              typeof PicoBlaze.setDisabledBreakpoint == "function")
+            PicoBlaze.setDisabledBreakpoint(address);
+        } else {
+          machineCode[address].disableBreakpoint = false;
+        }
+        address++;
+        machineCode[address].hex = "20";
+        machineCode[address].hex += node_of_depth_1.children[4].getLabelAddress(
+            output_of_preprocessor.labels, output_of_preprocessor.constants);
+        machineCode[address].line = node_of_depth_1.lineNumber;
+        machineCode[address].disableBreakpoint = true;
+        if (typeof PicoBlaze == "object" &&
+            typeof PicoBlaze.setDisabledBreakpoint == "function") {
+          PicoBlaze.setDisabledBreakpoint(address);
+        }
+        address++;
+      }
+    } else if (/^load$/i.test(node_of_depth_1.text)) {
       if (!check_if_there_are_three_child_nodes_and_the_second_one_is_comma())
         return;
       if (node_of_depth_1.children[0].getRegisterNumber(

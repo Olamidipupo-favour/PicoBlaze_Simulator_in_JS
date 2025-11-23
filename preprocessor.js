@@ -13,6 +13,8 @@ function isMnemonic(str) {
 function makeCompilationContext(root_of_the_abstract_syntax_tree,
                                 oldCompilationContext) {
   let context;
+  if (typeof oldCompilationContext == "undefined")
+    default_base_of_literals_in_assembly = 16;
   if (typeof oldCompilationContext != "undefined")
     context = oldCompilationContext;
   else
@@ -64,6 +66,34 @@ function makeCompilationContext(root_of_the_abstract_syntax_tree,
                  // works for PicoBlaze (where all directives have the same
                  // size: 18 bits).
     }
+    if (/^BASE_HEXADECIMAL$/i.test(node_of_depth_1.text)) {
+      default_base_of_literals_in_assembly = 16;
+      if (node_of_depth_1.children.length == 1) {
+        default_base_of_literals_in_assembly =
+            node_of_depth_1.children[0].interpretAsArithmeticExpression(
+                context.constants);
+      } else if (
+          node_of_depth_1.children.length !=
+          0) { // https://github.com/FlatAssembler/PicoBlaze_Simulator_in_JS/issues/35
+        alert(
+            "Line " + node_of_depth_1.lineNumber +
+            ': The "BASE_HEXADECIMAL" pseudo-mnemonic should have 0 or 1 arguments.');
+        return context;
+      }
+    }
+    if (/^BASE_DECIMAL$/i.test(node_of_depth_1.text)) {
+      default_base_of_literals_in_assembly = 10;
+      if (node_of_depth_1.children.length == 1) {
+        default_base_of_literals_in_assembly =
+            node_of_depth_1.children[0].interpretAsArithmeticExpression(
+                context.constants);
+      } else if (node_of_depth_1.children.length != 0) {
+        alert(
+            "Line " + node_of_depth_1.lineNumber +
+            ': The "BASE_DECIMAL" pseudo-mnemonic should have 0 or 1 arguments.');
+        return context;
+      }
+    }
     if (/:$/.test(node_of_depth_1.text)) {
       console.log(
           "DEBUG: Dealing with a label, point #1..."); // Eh, those JavaScript
@@ -86,7 +116,10 @@ function makeCompilationContext(root_of_the_abstract_syntax_tree,
       }
       console.log("DEBUG: Dealing with a label, point #2...");
       context.labels.set(
-          node_of_depth_1.text.substr(0, node_of_depth_1.text.length - 1),
+          node_of_depth_1.text.substring(
+              0,
+              node_of_depth_1.text.length -
+                  1), // https://github.com/FlatAssembler/PicoBlaze_Simulator_in_JS/issues/30
           address);
       console.log("DEBUG: Dealing with a label, point #3...");
     }
@@ -109,6 +142,21 @@ function makeCompilationContext(root_of_the_abstract_syntax_tree,
       address = node_of_depth_1.children[0].interpretAsArithmeticExpression(
           context.constants);
       console.log("DEBUG: Setting the address, point #3...");
+    }
+    if (/^PRINT_STRING$/i.test(node_of_depth_1.text)) {
+      if (node_of_depth_1.children.length != 5) {
+        alert(
+            "Line " + node_of_depth_1.lineNumber +
+            ": The \"print_string\" pseudo-mnemonic should have exactly five arguments (a ',' token also counts as an argument)!");
+        return context;
+      }
+      if (node_of_depth_1.children[0].text[0] != '\"') {
+        alert(
+            "Line " + node_of_depth_1.lineNumber +
+            ": The first argument to the \"print_string\" pseudo-mnemonic should be a string!");
+        return context;
+      }
+      address += (node_of_depth_1.children[0].text.length - 2) * 2;
     }
     if (/^constant$/i.test(node_of_depth_1.text) ||
         /^equ$/i.test(node_of_depth_1.text)) {
@@ -181,8 +229,10 @@ function makeCompilationContext(root_of_the_abstract_syntax_tree,
             )) {
       if (node_of_depth_1.children[0].text[0] == '"')
         document.getElementById("UART_OUTPUT").innerText +=
-            node_of_depth_1.children[0].text.substr(
-                1, node_of_depth_1.children[0].text.length - 2);
+            node_of_depth_1.children[0]
+                .text
+                .substring( // https://github.com/FlatAssembler/PicoBlaze_Simulator_in_JS/issues/30
+                    1, node_of_depth_1.children[0].text.length - 2 + 1);
       else {
         const ASCIIValue =
             node_of_depth_1.children[0].interpretAsArithmeticExpression(

@@ -64,7 +64,7 @@ describe("PicoBlaze MachineCode Simulator", () => {
       { hex: "01005", line: 3 },
       { hex: "19004", line: 4 },
     ];
-    console.time("test");
+    console.time("test"); // @agustiza, what does this do?
     simulator.simulateOneInstruction(); //load s0, 5
     simulator.simulateOneInstruction(); //sub s0, 4
 
@@ -77,7 +77,6 @@ describe("PicoBlaze MachineCode Simulator", () => {
       { hex: "01000", line: 3 },
       { hex: "19001", line: 4 },
     ];
-    console.time("test");
     simulator.simulateOneInstruction(); //load s0, 0
     simulator.simulateOneInstruction(); //sub s0, 1
 
@@ -169,4 +168,19 @@ describe("PicoBlaze MachineCode Simulator", () => {
 
     expect(document.getElementById("UART_OUTPUT").innerText).toBe("Hello");
   });
+
+  test("Function pointers work", () =>{
+    const machineCode = [
+      {hex: "01005", line: "2"}, //load s0, 5
+      {hex: "01100", line: "3"}, //load s1, 0
+      {hex: "26100", line: "4"}, //jump@(s1,s0)
+    ];
+    global.machineCode=machineCode;
+
+    simulator.simulateOneInstruction(); //load s0, 5
+    simulator.simulateOneInstruction(); //load s1, 0
+    simulator.simulateOneInstruction(); //jump@(s1,s0)
+    
+    expect(global.PC).toBe(5); //jump to address 5
+  })
 });

@@ -8,6 +8,7 @@ let simulationThread;
 let machineCode = [];
 for (let i = 0; i < 4096; i++)
   machineCode.push({hex : "00000", line : 0});
+let default_base_of_literals_in_assembly = 16;
 function displayRegistersAndFlags() {
   if (playing && !document.getElementById("shouldWeUpdateRegisters").checked)
     return;
@@ -109,11 +110,13 @@ function highlightToken(token) {
     // read more about it here:
     // https://github.com/FlatAssembler/PicoBlaze_Simulator_in_JS/issues/6
     return `<span class="flag">${token}</span>`;
-  if (/:$/.test(token))
+  if (/:$/.test(token) && token.length > 1)
     return `<span class="label">${token}</span>`;
   if (token[0] === '"')
     return `<span class="string">${token}</span>`;
-  if (/^(\d|[a-f])+$/i.test(token) || /\'d$/.test(token) || /\'b$/.test(token))
+  if (/^(\d|[a-f])+$/i.test(token) || /\'d$/.test(token) ||
+      /\'b$/.test(token) || /\'o$/.test(token) ||
+      /\'x$/.test(token))
     return `<span class="number">${token}</span>`;
   return token;
 }
@@ -170,7 +173,8 @@ function syntaxHighlighter(/*edit*/) {
     if ((assemblyCode[i] === " " || assemblyCode[i] === "\t" ||
          assemblyCode[i] === "," || assemblyCode[i] === "+" ||
          assemblyCode[i] === "-" || assemblyCode[i] === "*" ||
-         assemblyCode[i] === "/" || assemblyCode[i] === "^") &&
+         assemblyCode[i] === "/" || assemblyCode[i] === "^" ||
+         assemblyCode[i] === '?') &&
         !areWeInAString) {
       highlightedText += highlightToken(currentToken) + assemblyCode[i];
       currentToken = "";
@@ -259,57 +263,75 @@ function setupLayout() {
   // Modern browsers execute JavaScript so fast that calling "window.innerWidth"
   // multiple times within a function leads to a race condition.
   if (windowWidth < 500) {
-    document.getElementsByTagName("body")[0].style.backgroundImage = "none";
     document.getElementsByTagName("main")[0].style.left = 8 + "px";
   } else {
-    document.getElementsByTagName("body")[0].style.backgroundImage =
-        'url("Background.gif")';
     document.getElementsByTagName("main")[0].style.left =
         windowWidth / 2 - 500 / 2 + "px";
   }
   if (windowHeight < 400) {
     document.getElementById("buttons").style.top =
         windowHeight + 200 + 3 * 4 + "px";
+    document.getElementById("whyClickAssemble").style.top =
+        windowHeight + 200 + 3 * 4 + 20 + 5 + "px";
+    const heightOfTheDivWithTheInstructionAboutAssembling =
+        document.getElementById("whyClickAssemble").clientHeight;
     document.getElementById("divWithMachineCode").style.top =
-        windowHeight + 4 * 4 + 20 + 200 + "px";
+        windowHeight + 4 * 4 + 20 + 200 +
+        heightOfTheDivWithTheInstructionAboutAssembling + "px";
     document.getElementById("simulationButtons").style.top =
-        2 * windowHeight + 3 * 4 + 30 + 200 + "px";
+        2 * windowHeight + 3 * 4 + 30 + 200 +
+        heightOfTheDivWithTheInstructionAboutAssembling + "px";
     document.getElementsByTagName("footer")[0].style.top =
         65 + 4 + 2 * 50 + 3 * windowHeight + 200 + 210 + is_UART_enabled * 260 +
-        50 + "px";
+        50 + heightOfTheDivWithTheInstructionAboutAssembling + "px";
     document.getElementById("divWithExamples").style.top =
         windowHeight + 4 + "px";
     document.getElementById("simulationResults").style.top =
         windowHeight * 2 + 200 + 65 + 50 - 30 + 210 + is_UART_enabled * 260 +
-        50 + "px";
+        50 + heightOfTheDivWithTheInstructionAboutAssembling + "px";
     document.getElementById("graphicalResults").style.top =
-        windowHeight * 2 + 200 + 65 + 50 - 30 + "px";
+        windowHeight * 2 + heightOfTheDivWithTheInstructionAboutAssembling +
+        200 + 65 + 50 - 30 + "px";
     document.getElementById("UART_enable_button").style.top =
         windowHeight * 2 + 200 + 65 + 50 - 30 + 210 +
+        heightOfTheDivWithTheInstructionAboutAssembling +
         "px"; // Usually has no effect, see below...
     document.getElementById("UART_IO").style.top =
-        windowHeight * 2 + 200 + 65 + 50 - 30 + 210 + 50 + "px";
+        windowHeight * 2 + 200 + 65 + 50 - 30 + 210 + 50 +
+        heightOfTheDivWithTheInstructionAboutAssembling + "px";
   } else {
     document.getElementById("divWithExamples").style.top = 410 + "px";
     document.getElementById("buttons").style.top = 400 + 210 + 3 * 4 + "px";
-    document.getElementById("divWithMachineCode").style.top = 450 + 210 + "px";
-    document.getElementById("simulationButtons").style.top = 855 + 210 + "px";
+    document.getElementById("whyClickAssemble").style.top =
+        400 + 210 + 3 * 4 + 30 + "px";
+    const heightOfTheDivWithTheInstructionAboutAssembling =
+        document.getElementById("whyClickAssemble").clientHeight;
+    document.getElementById("divWithMachineCode").style.top =
+        450 + 210 + heightOfTheDivWithTheInstructionAboutAssembling + "px";
+    document.getElementById("simulationButtons").style.top =
+        855 + 210 + heightOfTheDivWithTheInstructionAboutAssembling + "px";
     document.getElementById("simulationResults").style.top =
-        910 + 2 * 210 + is_UART_enabled * 260 + 50 + "px";
+        910 + 2 * 210 + is_UART_enabled * 260 + 50 +
+        heightOfTheDivWithTheInstructionAboutAssembling + "px";
     document.getElementById("UART_IO").style.top =
-        910 + 2 * 210 + 50 + "px"; // Has no effect if the UART_IO is not shown
-                                   // (and it isn't shown by default).
+        910 + 2 * 210 + 50 + heightOfTheDivWithTheInstructionAboutAssembling +
+        "px"; // Has no effect if the UART_IO is not shown
+              // (and it isn't shown by default).
     document.getElementById("UART_enable_button").style.top =
-        910 + 2 * 210 + "px";
-    document.getElementById("graphicalResults").style.top = 910 + 210 + "px";
+        910 + 2 * 210 + heightOfTheDivWithTheInstructionAboutAssembling + "px";
+    document.getElementById("graphicalResults").style.top =
+        910 + 210 + heightOfTheDivWithTheInstructionAboutAssembling + "px";
     document.getElementsByTagName("footer")[0].style.top =
-        1380 + 2 * 210 + is_UART_enabled * 260 + 50 + 20 + "px";
+        1380 + 2 * 210 + is_UART_enabled * 260 + 50 + 20 +
+        heightOfTheDivWithTheInstructionAboutAssembling + "px";
   }
   if (/WebPositive/.test(
           navigator.userAgent)) { // WebPositive prints the #authors in such a
                                   // small font it's illegible.
     document.getElementById("authors").style.fontSize = "1.3em";
   }
+  if (window.onscroll)
+    window.onscroll();
 }
 let PC = 0;
 function formatAsAddress(n) {
@@ -333,15 +355,15 @@ function drawTable() {
   let tableHTML = `
   <button id="downloadHex"><img src="https://icons.getbootstrap.com/assets/icons/download.svg" alt="Download Hexadecimal"></button>
   <div id="warningAboutDownloadingHexadecimal">Clicking the button above will download the hexadecimal (<code>.HEX</code>) file, in the same format that the Xilinx PicoBlaze Assembler outputs. You need to convert it to a binary file before uploading it to PicoBlaze. I am sorry that this program is not outputting binary files, but there is no obvious way to do it since PicoBlaze instructions are 18-bit and the smallest addressable memory unit in JavaScript is byte (8 bits), and 18 bits is not divisible by bytes.</div>
-  <table id="machineCode">
+  <table id="machineCode" style="border-collapse: separate; border-spacing: 0;">
      <tr>
        <th colspan="4">Machine Code</th>
      </tr>
      <tr>
-       <th>PC</th>
-       <th>Address</th>
-       <th>Directive</th>
-       <th>Line</th>
+       <th class="sticky-header">PC</th>
+       <th class="sticky-header">Address</th>
+       <th class="sticky-header">Directive</th>
+       <th class="sticky-header">Line</th>
      </tr>
   `;
   for (let i = 0; i < machineCode.length; i++)
@@ -407,12 +429,12 @@ Displaying registers and flags on every step is useful for debugging, but it slo
   I have good reasons to think the emulation of flags is unrealistic,
   especially when it comes to <code>REGBANK</code>s.</div>`;
   let inputOutputTable = `
-<table>
+<table style="border-collapse: separate; border-spacing: 0;">
 <tr>
-<th>Address</th>
-<th>Input</th>
-<th>Output</th>
-<th>Memory</th>
+<th class="sticky-header">Address</th>
+<th class="sticky-header">Input</th>
+<th class="sticky-header">Output</th>
+<th class="sticky-header">Memory</th>
 </tr>
   `;
   for (let i = 0; i < 256; i++)
@@ -442,13 +464,25 @@ Displaying registers and flags on every step is useful for debugging, but it slo
       document.getElementById("input_03").disabled = is_UART_enabled;
 }
 function downloadHex() {
-  /*
-  Loosely based on:
-  https://stackoverflow.com/a/33622881/8902065
-  */
+  if (!hasTheCodeBeenAssembled) {
+    if (!confirm(
+            "The code has not been assembled. Do you really want to proceed downloading the hexadecimal file?"))
+      return;
+  } else if (
+      hasTheCodeBeenModifiedSinceLastSuccessfulAssembly) // https://github.com/FlatAssembler/PicoBlaze_Simulator_in_JS/issues/28
+  {
+    if (!confirm(
+            "The code has been modified since the last successful assembling. Are you sure you want to proceed downloading the hexadecimal file?"))
+      return;
+  }
   if (/WebPositive/.test(navigator.userAgent))
     alert(
         "It's detected you are using WebPositive. 'Download Hexadecimal' didn't work there when we tested it.");
+
+  /*
+  The following code is loosely based on:
+  https://stackoverflow.com/a/33622881/8902065
+  */
   let hexadecimalString = "";
   for (let i = 0; i < 2 ** 12; i++)
     hexadecimalString += machineCode[i].hex + "\r\n";
@@ -482,7 +516,7 @@ function displayOutput() {
                            output[2] % 2 ** 4);
   for (let i = 0; i < 8; i++)
     document.getElementById("LED" + i).setAttribute(
-        "fill", output[0] & (1 << i) ? "lightGreen" : "#333333");
+        "fill", output[0] & (1 << i) ? "lightGreen" : "#333");
 }
 function displayHexadecimalNumber(display, number) {
   if (!(display instanceof SVGElement) ||
@@ -525,6 +559,8 @@ function displayHexadecimalNumber(display, number) {
                                      LED[i] === "0" ? "#333333" : "#ffaaaa");
 }
 function fetchExample(exampleName) {
+  hasTheCodeBeenModifiedSinceLastSuccessfulAssembly =
+      true; // https://github.com/FlatAssembler/PicoBlaze_Simulator_in_JS/issues/29
   document.getElementById("assemblyCode").innerHTML =
       ";Fetching the example from GitHub...";
   setUpLineNumbers();

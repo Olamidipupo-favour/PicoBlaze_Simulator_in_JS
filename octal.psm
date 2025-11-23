@@ -1,0 +1,95 @@
+;This is a program which is supposed to
+;convert binary numbers entered using the
+;switches to octal, and display the octal
+;numbers using the 7-segment displays.
+;For converting binary digits to octal, it
+;is supposed to use the algorithm we were
+;taught in our Digital Electronics classes,
+;namely, grouping the binary digits into
+;groups of three starting with the last
+;digit, and then converting each group of
+;the binary digits to octal separately.
+;As far as I've tested this program,
+;it works. I haven't tested it on
+;real PicoBlaze, though.
+
+base_decimal 8 ;We are going to use a lot
+               ;of octal numbers in this
+               ;program, so it makes sense
+               ;to switch the default base
+               ;of numerical literals to
+               ;8, so that we don't have
+               ;to append `'o` every time
+               ;we write an octal number.
+
+address 0 ;That's a message to the
+          ;preprocessor of the assembler
+          ;to start assembling from the
+          ;memory address 0. Every
+          ;PicoBlaze program starts like
+          ;that.
+
+input s0, 0 ;The switches are at the
+            ;input address 0.
+
+;The octal numbers that fit in 8 bits
+;can be up to 3 digits long. I think
+;it's easier to deal with the first
+;digit separately, storing it in the
+;register sc.
+namereg sc, first_digit
+load first_digit, s0
+and first_digit, 300
+and s0, 077
+;The idea to rotate the first digit
+;left two times instead of shifting
+;it to the right six times was given
+;to me by a StackExchange user called
+;<a href="https://codereview.stackexchange.com/a/294547/219010">RootTwo</a>.
+rl first_digit
+rl first_digit
+
+;So, here goes the core of the algorithm.
+;It's supposed to take s0 as the input,
+;the binary digits 00ABCDEF, and store
+;into sa the result 0ABC0DEF.
+load sa, 0
+load s3, 0
+beginning_of_the_loop:
+  compare s3, 2 * 3 + 1 ;Six binary digits
+                        ;plus one step with
+                        ;the special case.
+  jump nc, end_of_the_loop
+  compare s3, 3
+  jump nz, not_the_special_case
+    ;The fourth time, do nothing except
+    ;shifting sa to the right and
+    ;increasing the counter.
+    sr0 sa
+    add s3, 1
+    jump beginning_of_the_loop
+  not_the_special_case:
+    sr0 s0
+    sra sa
+    add s3, 1
+  jump beginning_of_the_loop
+end_of_the_loop:
+sr0 sa
+
+;And now output the octal number you have
+;got to the seven-segment displays. The
+;first two digits are the output address 1,
+;and the second two are the output
+;address 2.
+output sa, 2
+output first_digit, 1
+
+;Then run into an infinite loop...
+jump 0 ;You can add a breakpoint here.
+
+;You also have another PicoBlaze assembly
+;program converting binary numbers to
+;octal, using consecutive division, <a href="https://picoblaze-simulator.sourceforge.io/PicoBlaze.html?id=61">here</a>.
+
+;I've also made a <a href="https://codereview.stackexchange.com/q/294517/219010">StackExchange thread</a>
+;about this program.

@@ -1,34 +1,54 @@
-const btn = document.getElementById("shareButton")
+const btn = document.getElementById("shareButton");
 
 btn.addEventListener("click", (e) => {
-    console.log("====\nSaving the program====\n")
-    saveAssemblyCode()
-})
+  console.log("====\nSaving the program====\n");
+  saveAssemblyCode();
+});
 
-    function saveAssemblyCode() {
-      const assemblyCode = document.getElementById("assemblyCode").innerText;
+function saveAssemblyCode() {
+  const assemblyCode = document.getElementById("assemblyCode").innerText;
 
-      const formData = new FormData();
-      formData.append('code', assemblyCode);
+  const formData = new FormData();
+  formData.append("code", assemblyCode);
 
-      fetch('db.php', {method : 'POST', body : formData})
+  fetch("db.php", {method : "POST", body : formData, redirect : "error"})
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error("The server responded with error: " +
+                          response.status);
+        }
 
-          .then(response => {
-            if (!response.ok) {
-              throw new Error('Network response was not ok');
-            }
+        return response.text();
+      })
 
-            return response.text();
-          })
+      .then((data) => {
+        // data is ?id=int
+        if (!/^\?id=\d+/.test(
+                data)) { // https://github.com/FlatAssembler/PicoBlaze_Simulator_in_JS/issues/36
+          throw new Error(
+              "The server responded with `200 OK`, but the data it sent is not formatted to be parsable by the front-end: " +
+              data);
+        }
+        const shareURL =
+            `${new URL(window.location.href).origin}/PicoBlaze.html${data}`;
+        document.getElementById("shareURL").innerText = shareURL;
+        document.getElementById("uploadSuccessfulMessage").style.display =
+            "block";
+      })
 
-          .then(data => {
-            // data is ?id=int
+      .catch((error) => { alert(error); });
+}
 
-            const message = "Share URL: ";
-            prompt(message,
-                   `${new URL(window.location.href).origin}/PicoBlaze.html${
-                       data}`);
-          })
-
-          .catch(error => { console.error(error); });
-    }
+function copyShareURLToClipboard() {
+  const shareURL = document.getElementById("shareURL").innerText;
+  if (!navigator.clipboard) {
+    alert(
+        "Your browser, for some reason, doesn't let JavaScript access the clipboard. You will need to copy the URL manually.");
+    return;
+  }
+  navigator.clipboard.writeText(shareURL)
+      .then(() => { alert("The URL is successfully copied!"); })
+      .catch(
+          () => {alert(
+              "Copying the URL to clipboard didn't succeed. You will need to copy the URL manually.")});
+}

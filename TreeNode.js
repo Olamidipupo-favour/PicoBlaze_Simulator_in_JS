@@ -1,4 +1,49 @@
 "use strict";
+
+function LevenshtainDistance(A, B) {
+  // Will be used to find the closest label to the one that the user has.
+  // Adapted from:
+  // https://github.com/royalpranjal/Interview-Bit/blob/master/DynamicProgramming/EditDistance.cpp
+
+  const row = A.length;
+  const col = B.length;
+
+  const temp = [];
+  for (let i = 0; i < row + 1; i++) {
+    let tmp = [];
+    for (let j = 0; j < col + 1; j++) {
+      tmp.push(0);
+    }
+    temp.push(tmp);
+  }
+
+  const min =
+      (a, b) => {
+        if (a < b)
+          return a;
+        else
+          return b;
+      }
+
+  for (let i = 0; i < temp.length; i++) {
+    for (let j = 0; j < temp[0].length; j++) {
+      if (j == 0) {
+        temp[i][j] = i;
+      } else if (i == 0) {
+        temp[i][j] = j;
+      } else if (A[i - 1] == B[j - 1]) {
+        temp[i][j] = temp[i - 1][j - 1];
+      } else {
+        temp[i][j] = min(temp[i - 1][j - 1], temp[i - 1][j]);
+        temp[i][j] = min(temp[i][j - 1], temp[i][j]);
+        temp[i][j] = temp[i][j] + 1;
+      }
+    }
+  }
+
+  return temp[row][col];
+}
+
 class TreeNode {
   constructor(text, lineNumber) {
     this.text = text;
@@ -16,10 +61,17 @@ class TreeNode {
         ret += this.children[i].getLispExpression() + ")";
     return ret;
   }
-  interpretAsArithmeticExpression(constants) {
+  interpretAsArithmeticExpression(constants, labels) {
     if (!(constants instanceof Map)) {
       alert(
           'Internal compiler error: The "constants" argument is not of the type "Map"!');
+    }
+    if (labels && !(labels instanceof Map)) {
+      alert(
+          'Internal compiler error: The "labels" argument is not of the type "Map"!');
+    }
+    if (labels && labels.has(this.text)) {
+      return labels.get(this.text);
     }
     if (constants.has(this.text))
       return constants.get(this.text);
@@ -61,6 +113,16 @@ class TreeNode {
     if (this.text == "|")
       return (this.children[0].interpretAsArithmeticExpression(constants) ||
               this.children[1].interpretAsArithmeticExpression(constants));
+    if (this.text == "?:")
+      return (
+          this.children[0].interpretAsArithmeticExpression(constants)
+              ? this.children[1].interpretAsArithmeticExpression(constants,
+                                                                 labels)
+              : this.children[2].interpretAsArithmeticExpression(
+                    constants,
+                    labels)); // We are passing "labels" in an attempt to mend
+                              // this bug:
+                              // https://github.com/FlatAssembler/PicoBlaze_Simulator_in_JS/issues/38
     if (this.text == "()") {
       if (this.children.length != 1) {
         alert("Line #" + this.lineNumber +
@@ -69,14 +131,117 @@ class TreeNode {
       }
       return this.children[0].interpretAsArithmeticExpression(constants);
     }
-    if (/\'d/.test(this.text))
-      return parseInt(this.text.substr(0, this.text.length - 2));
-    if (/\'b/.test(this.text))
-      return parseInt(this.text.substr(0, this.text.length - 2), 2);
+    if (this.text == "invertBits()") {
+      if (this.children.length != 1) {
+        alert("Line #" + this.lineNumber +
+              ": The node 'invertBits()' doesn't have exactly 1 child.");
+        return NaN;
+      }
+      return ~this.children[0].interpretAsArithmeticExpression(constants);
+    }
+    if (this.text == "bitand()") {
+      if (this.children.length != 3 || this.children[1].text != ',') {
+        alert(
+            "Line #" + this.lineNumber +
+            ": The node 'bitand()' doesn't have exactly 3 children (a comma is also a child node).");
+        return NaN;
+      }
+      return this.children[0].interpretAsArithmeticExpression(constants) &
+             this.children[2].interpretAsArithmeticExpression(constants);
+    }
+    if (this.text == "bitor()") {
+      if (this.children.length != 3 || this.children[1].text != ',') {
+        alert(
+            "Line #" + this.lineNumber +
+            ": The node 'bitor()' doesn't have exactly 3 children (a comma is also a child node).");
+        return NaN;
+      }
+      return this.children[0].interpretAsArithmeticExpression(constants) |
+             this.children[2].interpretAsArithmeticExpression(constants);
+    }
+    if (this.text == "mod()") {
+      if (this.children.length != 3 || this.children[1].text != ',') {
+        alert(
+            "Line #" + this.lineNumber +
+            ": The node 'mod()' doesn't have exactly 3 children (a comma is also a child node).");
+        return NaN;
+      }
+      return this.children[0].interpretAsArithmeticExpression(constants) %
+             this.children[2].interpretAsArithmeticExpression(constants);
+    }
+    if (/\'d$/.test(this.text)) {
+      for (let i = 0; i < this.text.length - 2; i++)
+        if (this.text.charCodeAt(i) < '0'.charCodeAt(0) ||
+            this.text.charCodeAt(i) > '9'.charCodeAt(0)) {
+          alert(
+              "Line #" + this.lineNumber + ": `" + this.text +
+              "` is not a valid decimal constant!"); // https://github.com/FlatAssembler/PicoBlaze_Simulator_in_JS/issues/27
+          return NaN;
+        }
+      return parseInt(this.text.substring(
+          0,
+          this.text.length -
+              2)); // https://github.com/FlatAssembler/PicoBlaze_Simulator_in_JS/issues/30
+    }
+    if (/\'o$/.test(this.text)) {
+      for (let i = 0; i < this.text.length - 2; i++)
+        if (this.text.charCodeAt(i) < '0'.charCodeAt(0) ||
+            this.text.charCodeAt(i) > '7'.charCodeAt(0)) {
+          alert(
+              "Line #" + this.lineNumber + ": `" + this.text +
+              "` is not a valid octal constant!"); // https://github.com/FlatAssembler/PicoBlaze_Simulator_in_JS/issues/27
+          return NaN;
+        }
+      return parseInt(
+          this.text.substring(0, this.text.length - 2),
+          8); // https://github.com/FlatAssembler/PicoBlaze_Simulator_in_JS/issues/30
+    }
+    if (/\'b$/.test(this.text)) {
+      for (let i = 0; i < this.text.length - 2; i++)
+        if (!(this.text[i] == '0' || this.text[i] == '1')) {
+          alert("Line #" + this.lineNumber + ": `" + this.text +
+                "` is not a valid binary constant!");
+          return NaN;
+        }
+      return parseInt(
+          this.text.substring(0, this.text.length - 2),
+          2); // https://github.com/FlatAssembler/PicoBlaze_Simulator_in_JS/issues/30
+    }
+    if (/\'x$/.test(this.text)) {
+      if (!(/^([a-f]|[0-9])*\'x$/i.test(this.text))) {
+        alert("Line #" + this.lineNumber + ": `" + this.text +
+              "` is not a valid hexadecimal constant!");
+        return NaN;
+      }
+      return parseInt(
+          this.text.substring(0, this.text.length - 2),
+          16); // https://github.com/FlatAssembler/PicoBlaze_Simulator_in_JS/issues/30
+    }
     if (/^([a-f]|[0-9])*$/i.test(this.text))
-      return parseInt(this.text, 16);
+      return parseInt(
+          this.text,
+          ((typeof default_base_of_literals_in_assembly) == "undefined")
+              ? 16
+              : default_base_of_literals_in_assembly);
     if (this.text[0] === '"' && this.text.length === 3)
       return this.text.charCodeAt(1);
+    let keys = [];
+    constants.forEach((value, key) => { keys.push(key); });
+    let smallest_Levenshtain_distance = keys[0];
+    for (const key of keys) {
+      if (LevenshtainDistance(key, this.text) <
+          LevenshtainDistance(smallest_Levenshtain_distance, this.text)) {
+        smallest_Levenshtain_distance = key;
+      }
+    }
+    if (confirm("Instead of \"" + this.text + "\", in the line #" +
+                this.lineNumber + ", did you perhaps mean \"" +
+                smallest_Levenshtain_distance + "\"?")) {
+      if (constants.has(smallest_Levenshtain_distance)) {
+        constants.set(this.text, constants.get(smallest_Levenshtain_distance));
+        return constants.get(this.text);
+      }
+    }
     alert('Some part of the assembler tried to interpret the token "' +
           this.text + '" in the line #' + this.lineNumber +
           " as a part of an arithmetic expression, which makes no sense.");
@@ -107,9 +272,32 @@ class TreeNode {
   }
   getRegisterNumber(registers) {
     if (registers.has(this.text))
-      return registers.get(this.text).substr(1).toLowerCase();
+      return registers.get(this.text)
+          .substring(1)
+          .toLowerCase(); // https://github.com/FlatAssembler/PicoBlaze_Simulator_in_JS/issues/30
     if (/^s(\d|[a-f])$/i.test(this.text))
-      return this.text.substr(1).toLowerCase();
+      return this.text.substring(1)
+          .toLowerCase(); // https://github.com/FlatAssembler/PicoBlaze_Simulator_in_JS/issues/30
+    // https://github.com/FlatAssembler/PicoBlaze_Simulator_in_JS/issues/37#issuecomment-2778246629
+    let register_name_with_Levenshtain_distance_of_one;
+    registers.forEach((value, key) => {
+      if (LevenshtainDistance(key, this.text) == 1)
+        register_name_with_Levenshtain_distance_of_one = key;
+    });
+    if (register_name_with_Levenshtain_distance_of_one) {
+      if (confirm(
+              "Instead of \"" + this.text + "\", in the line #" +
+              this.lineNumber + ", did you perhaps mean \"" +
+              register_name_with_Levenshtain_distance_of_one +
+              "\", an alternate name for the register \"" +
+              registers.get(register_name_with_Levenshtain_distance_of_one) +
+              "\"?")) {
+        registers.set(
+            this.text,
+            registers.get(register_name_with_Levenshtain_distance_of_one));
+        return registers.get(this.text).substring(1).toLowerCase();
+      }
+    }
     return "none";
   }
   getLabelAddress(labels, constants) {
@@ -118,9 +306,35 @@ class TreeNode {
     if (constants.has(this.text))
       return formatAsAddress(constants.get(this.text));
     if (/^(\d|[a-f])*$/i.test(this.text) ||
-        [ "+", "-", "*", "/" ].includes(this.text))
-      // Must not detect "()" as a label.
-      return formatAsAddress(this.interpretAsArithmeticExpression(constants));
+        [ "+", "-", "*", "/", "^", "?:" ].includes(this.text))
+      return formatAsAddress(this.interpretAsArithmeticExpression(
+          constants,
+          labels)); // We are passing the `labels` argument to resolve this bug:
+                    // https://github.com/FlatAssembler/PicoBlaze_Simulator_in_JS/issues/38
+    if (this.text == "()")
+      return "none"; // Must not detect "()" as a label.
+    let keys = [];
+    labels.forEach((value, key) => { keys.push(key); });
+    constants.forEach((value, key) => { keys.push(key); });
+    let smallest_Levenshtain_distance = keys[0];
+    for (const key of keys) {
+      if (LevenshtainDistance(key, this.text) <
+          LevenshtainDistance(smallest_Levenshtain_distance, this.text)) {
+        smallest_Levenshtain_distance = key;
+      }
+    }
+    if (confirm("Instead of \"" + this.text + "\", in the line #" +
+                this.lineNumber + ", did you perhaps mean \"" +
+                smallest_Levenshtain_distance + "\"?")) {
+      if (labels.has(smallest_Levenshtain_distance)) {
+        labels.set(this.text, labels.get(smallest_Levenshtain_distance));
+        return formatAsAddress(labels.get(smallest_Levenshtain_distance));
+      }
+      if (constants.has(smallest_Levenshtain_distance)) {
+        constants.set(this.text, constants.get(smallest_Levenshtain_distance));
+        return formatAsAddress(constants.get(smallest_Levenshtain_distance));
+      }
+    }
     return "none";
   }
 }
